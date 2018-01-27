@@ -77,3 +77,10 @@ MeanAndRangeWNT <- ddply(WNTPlayers, .(Position), summarize,
                          )
 MeanAndRangeWNT # For some reason sd() only calculated non-NA values if done prior to the mean calculation
 
+# Create plot to show mean and a basic interval to hit by position
+  # Note that some skills are preferred to be out of the interval
+    # E.g. if someone has a 30 time below avg - sd, that is phenomenal and should be worth points
+    # As we go further, perhaps we think of a scoring metric as a deviation multiplier
+MassPlot <- ggplot(data = MeanAndRangeWNT, aes(x = Position, y = avg_Mass))+
+  geom_point()+
+  geom_errorbar(aes(ymin = avg_Mass - std_Mass, ymax = avg_Mass + std_Mass))
