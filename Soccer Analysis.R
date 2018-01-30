@@ -84,3 +84,11 @@ MeanAndRangeWNT # For some reason sd() only calculated non-NA values if done pri
 MassPlot <- ggplot(data = MeanAndRangeWNT, aes(x = Position, y = avg_Mass))+
   geom_point()+
   geom_errorbar(aes(ymin = avg_Mass - std_Mass, ymax = avg_Mass + std_Mass))
+
+SpeedPlot <- ggplot(data = MeanAndRangeWNT, aes(x = Position, y = avg_X30.15))+
+  geom_point()+
+  geom_errorbar(aes(ymin = avg_X30.15 - std_X30.15, ymax = avg_X30.15 + std_X30.15))
+
+X40YardDash <- ggplot(data = MeanAndRangeWNT, aes(x = Position, y = avg_X40m))+
+  geom_point()+
+  geom_errorbar(aes(ymin = avg_X40m - std_X40m, ymax = avg_X40m + std_X40m))
