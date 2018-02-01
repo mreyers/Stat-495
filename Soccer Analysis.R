@@ -5,9 +5,12 @@ library(ggplot2)
 library(plyr)
 library(tidyverse)
 
+# User pathways, until we find a better way
+#path <- "C:/Users/mreyers/Downloads/soccer.csv"
+#path <- "X:/Downloads Part 2/soccer.csv"
 
 # Read in the data
-soccer <- read.csv("X:/Downloads Part 2/soccer.csv", as.is = TRUE, strip.white = TRUE, header = TRUE)
+soccer <- read.csv(path, as.is = TRUE, strip.white = TRUE, header = TRUE)
 
 # Basic data check
 head(soccer)
@@ -28,10 +31,14 @@ soccer$UsableData <- countsNotID
 dataPlot <- ggplot(data = soccer, aes(x = UsableData, fill = Team))+
   geom_histogram(binwidth = 1)
 
+# Add a column indicating whether a player eventually makes the WNT or has not yet 
+madeTeam <- soccer %>% group_by(id) %>% select(Team, id) %>% summarize(mean = mean(Team == "WNT")) %>% mutate(madeTeam = (mean > 0)) %>% select(-mean)
+soccer <- soccer %>% merge(madeTeam, all = TRUE, by = "id")
+
 # Separate the data into those that are on WNT and those that are not
 WNT <- soccer %>% filter(Team == "WNT")
 Amateurs <- soccer %>% filter(Team != "WNT")
-dim(setdiff(WNT, Amateurs)) # Shows that the separated sets are indeed mutually exclusive
+dim(setdiff(WNT, Amateurs)) # Shows that the separated sets are indeed mutually exclusive. Since this is equal to dim(WNT), sets are entirely exclusive
 
 # Assemble a player profile for national team players based on multiple testing rounds
 WNTPlayers <- ddply(WNT, .(id, Team, Position), summarize,
@@ -114,6 +121,8 @@ X40YardDash <- ggplot(data = MeanAndDevWNT, aes(x = Position, y = avg_X40m))+
 head(Amateurs)  
 
 # Average Amateur performance by id as some players are tested multiple times
+  # Might be worth averaging these in a weighted fashion, dependent on age. More recent results should probably bare more in terms of likelihood to make team
+  # For now leave as normal average
 AmateurUnique <- ddply(Amateurs, .(id, Position), summarize,
                        Age = mean(Age, na.rm = TRUE),
                        avg_Mass = mean(Mass, na.rm = TRUE),
