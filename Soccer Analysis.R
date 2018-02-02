@@ -92,7 +92,7 @@ MassPlot <- ggplot(data = MeanAndDevWNT, aes(x = Position, y = avg_Mass))+
   geom_point()+
   geom_errorbar(aes(ymin = avg_Mass - std_Mass, ymax = avg_Mass + std_Mass))
 
-SpeedPlot <- ggplot(data = MeanAndDevWNT, aes(x = Position, y = avg_X30.15))+
+AgilityPlot <- ggplot(data = MeanAndDevWNT, aes(x = Position, y = avg_X30.15))+
   geom_point()+
   geom_errorbar(aes(ymin = avg_X30.15 - std_X30.15, ymax = avg_X30.15 + std_X30.15))
 
@@ -102,8 +102,9 @@ X40YardDash <- ggplot(data = MeanAndDevWNT, aes(x = Position, y = avg_X40m))+
 
 # Events where it is desirable to be below the average score: x30.15, x10m, x30m, x40m
 # Events where it is desirable to be aboce the average score: height and mass (maybe, probably the interaction of height with speed), max speed,
-#                                                             Squat jump, broad jump
-# Events where we are unsure what is measured: ASR and CMJ
+#                                                             Squat jump, broad jump, CMJ (basically fluid vertical jump)
+# Events where we are unsure what is desirable: ASR (Anaerobic Speed Reserve) is the difference between maximal anaerobic speed (sprint) and maximal aerobic speed (distance run)
+# Expectation is that this is best used as an interaction term with 40m sprint time
 
 # Create National Ranges from quantile information instead of just the above
   # Involves splitting data into frames for each position
@@ -139,16 +140,58 @@ AmateurUnique <- ddply(Amateurs, .(id, Position), summarize,
                        )
 head(AmateurUnique)
 
+AmateurUniqueNoPos <- ddply(Amateurs, .(id), summarize,
+                            Age = mean(Age, na.rm = TRUE),
+                            avg_Mass = mean(Mass, na.rm = TRUE),
+                            avg_Height = mean(Height, na.rm = TRUE),
+                            avg_X30.15 = mean(X30.15, na.rm = TRUE),
+                            avg_X10m = mean(X10m, na.rm = TRUE),
+                            avg_X30m = mean(X30m, na.rm = TRUE),
+                            avg_X40m = mean(X40m, na.rm = TRUE),
+                            avg_Max.Speed = mean(Max.Speed, na.rm = TRUE),
+                            avg_ASR = mean(ASR, na.rm = TRUE),
+                            avg_Squat.Jump = mean(Squat.Jump, na.rm = TRUE),
+                            avg_Broad.Jump = mean(Broad.Jump, na.rm = TRUE),
+                            avg_CMJ = mean(CMJ, na.rm = TRUE)
+                            ) 
+head(AmateurUniqueNoPos)
+
+# Events that are timed have exclusion value of 100 (NA spot holder). Others have spot holder of 0.
+AmateurBestPerformance <- ddply(Amateurs, .(id, Position), summarize,
+                                Age = max(c(Age, 0), na.rm = TRUE),
+                                Mass = max(c(Mass, 0), na.rm = TRUE),
+                                Height = max(c(Height, 0), na.rm = TRUE),
+                                X30.15 = min(c(X30.15, 100), na.rm = TRUE),
+                                X10m = min(c(X10m, 100), na.rm = TRUE),
+                                X30m = min(c(X30m, 100), na.rm = TRUE),
+                                X40m = min(c(X40m, 100), na.rm = TRUE),
+                                Max.Speed = max(c(Max.Speed, 0), na.rm = TRUE),
+                                ASR = max(c(ASR, 0), na.rm = TRUE),
+                                Squat.Jump = max(c(Squat.Jump, 0), na.rm = TRUE),
+                                Broad.Jump = max(c(Broad.Jump, 0), na.rm = TRUE),
+                                Max_CMJ = max(c(CMJ, 0), na.rm = TRUE),
+                                Min_CMJ = min(c(CMJ, 100), na.rm = TRUE) 
+                                )
+head(AmateurBestPerformance)
+
 # Since age is a component of these tests, would be interesting to include biomechanical predictions as to what a score for a 14 year old would
 # be 5-10 years later (when they would actually be considered for the team)
+  # Looks like too much is hereditary and is interfering with a nice equation formulation
 # May also need to look into imputation techniques for missing categories
 
 # Compare and score each player against the WNT metrics for each test
 # For now use a 0-6 scale: 0 = below min, 1 = between min and first quartile, ..., 4 = between third quartile and max, 5 = beyond max
 # Scale is reversed for events that desire low test scores (timed events) so that an overall high score indicates excellent testing
 comparison <- function(playerRow){
-  pos <- playerRow$Position
-  WNTStandard <- positionRanges[[pos]]
+  if(playerRow$Position[1] == "CF"){
+    pos <- "FWD"
+  }
+  else{  
+    pos <- playerRow$Position
+  }
+  # Currently neglects players who have switched position, to be fixed later
+  WNTStandard <- positionRanges[[pos[1]]]
+  playerRow <- playerRow[1,]
   score <- 0
   # Timed events
   timed <- playerRow %>% select(avg_X30.15, avg_X10m, avg_X30m, avg_X40m)
@@ -176,6 +219,7 @@ comparison <- function(playerRow){
   # Non-timed events
   untimed <- playerRow %>% select(avg_Mass, avg_Height, avg_Max.Speed, avg_Squat.Jump, avg_Broad.Jump)
   for(j in names(untimed)){
+    
     if(!is.na(playerRow[, i])){
       if(playerRow[, i] > WNTStandard[5, i]){
         score <- score + 5
@@ -198,5 +242,15 @@ comparison <- function(playerRow){
 }
 
 # The first player (id = 1) scores a 29 according to combine metrics, will design a baseline for WNT later
-testAmateur <- comparison(AmateurUnique[1,])
+testAmateur <- comparison(AmateurUnique[AmateurUnique$id == 1,])
 testAmateur
+
+allAmateurScores <- list()
+scores <- c()
+for( k in unique(AmateurUnique$id)){
+  allAmateurScores[[k]] <- comparison(AmateurUnique[AmateurUnique$id == k,])
+  scores[k] <- allAmateurScores[[k]]$score
+}
+
+idAndScores <- data.frame(id = 1:max(AmateurUnique$id), scores) %>% filter(!is.na(scores))
+idAndScores[order(-idAndScores$scores), ]
