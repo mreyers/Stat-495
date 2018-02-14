@@ -15,6 +15,7 @@ soccer <- read.csv(path, as.is = TRUE, strip.white = TRUE, header = TRUE)
 # Basic data check
 head(soccer)
 summary(soccer)
+soccer <- soccer %>% select(-Squat.Jump)
 
 # Average amount of data we have to work with
 missingCheck <- apply(soccer, MARGIN = 2, FUN = is.na)
@@ -252,5 +253,73 @@ for( k in unique(AmateurUnique$id)){
   scores[k] <- allAmateurScores[[k]]$score
 }
 
+allProScores <- list()
+scoresPro <- c()
+for(m in unique(WNTPlayers$id)){
+  allProScores[[m]] <- comparison(WNTPlayers[WNTPlayers$id == m,])
+  scoresPro[m] <- allProScores[[m]]$score
+}
+
 idAndScores <- data.frame(id = 1:max(AmateurUnique$id), scores) %>% filter(!is.na(scores))
 idAndScores[order(-idAndScores$scores), ]
+
+proAndScores <- data.frame(id = 1:max(WNTPlayers$id), scoresPro) %>% filter(!is.na(scoresPro))
+proAndScores[order(-proAndScores$scoresPro),]
+
+arbitraryX40M <- ggplot(data = Amateurs[Amateurs$UsableData>=10, ], aes(x = Age, y = Broad.Jump, colour = madeTeam))+
+  geom_point()+
+  geom_line()
+
+dim(Amateurs[Amateurs$UsableData >= 11, ])
+
+library("PerformanceAnalytics")
+corVars <- Amateurs[, c(8:17)]
+chart.Correlation(corVars, histogram =TRUE, pch = 19)
+
+
+############ IMPUTATION #############
+library(mice)
+corVarsMICE <- mice(corVars)
+tempSet1 <- complete(corVarsMICE, action = 1)
+tempSet2 <- complete(corVarsMICE, action = 2)
+tempSet3 <- complete(corVarsMICE, action = 3)
+tempSet4 <- complete(corVarsMICE, action = 4)
+tempSet5 <- complete(corVarsMICE, action = 5)
+
+# Bind the matrices to prove correlation is retained
+library(abind)
+cor_array <- abind(cor(tempSet1),
+                   cor(tempSet2),
+                   cor(tempSet3),
+                   cor(tempSet4),
+                   cor(tempSet5),
+                   along = 3)
+
+cor_array_mean <- apply(cor_array, c(1,2), mean)
+cor_array_var  <- apply(cor_array, c(1,2), var)
+
+cor_array_mean
+
+imputedSet <- data.frame()
+
+for(i in 1:dim(tempSet1)[1]){
+  for(j in 1:dim(tempSet1)[2]){
+    imputedSet[i,j] <- mean(tempSet1[i, j],
+                            tempSet2[i, j],
+                            tempSet3[i, j],
+                            tempSet4[i, j],
+                            tempSet5[i, j])
+  }
+}
+names(imputedSet) <- names(Amateurs)[8:17]
+imputedSet$id <- Amateurs$id
+
+# KNN imputation, clean this up for the scaling to get back normal values 
+library(VIM)
+fullSet <- Amateurs[, c(8:17)]
+timedAmateur <- Amateurs[, 10:13]
+untimedAmateur <- Amateurs[, c(8, 9, 14:17)]
+knnTest <- kNN(as.tibble(scale(fullSet)), k = 5)
+knnTest
+
+mean(c(-scale(fullSet$Mass), -knnTest$Mass), na.rm = TRUE)
