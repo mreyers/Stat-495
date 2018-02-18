@@ -52,7 +52,6 @@ WNTPlayers <- ddply(WNT, .(id, Team, Position), summarize,
                     avg_X40m = mean(X40m, na.rm = TRUE),
                     avg_Max.Speed = mean(Max.Speed, na.rm = TRUE),
                     avg_ASR = mean(ASR, na.rm = TRUE),
-                    avg_Squat.Jump = mean(Squat.Jump, na.rm = TRUE),
                     avg_Broad.Jump = mean(Broad.Jump, na.rm = TRUE),
                     avg_CMJ = mean(CMJ, na.rm = TRUE))
 head(WNTPlayers)
@@ -76,8 +75,6 @@ MeanAndDevWNT <- ddply(WNTPlayers, .(Position), summarize,
                          avg_Max.Speed = mean(avg_Max.Speed, na.rm = TRUE),
                          std_ASR = sd(avg_ASR, na.rm = TRUE),
                          avg_ASR = mean(avg_ASR, na.rm = TRUE),
-                         std_Squat.Jump = sd(avg_Squat.Jump, na.rm = TRUE),
-                         avg_Squat.Jump = mean(avg_Squat.Jump, na.rm = TRUE),
                          std_Broad.Jump = sd(avg_Broad.Jump, na.rm = TRUE),
                          avg_Broad.Jump = mean(avg_Broad.Jump, na.rm = TRUE),
                          std_CMJ = sd(avg_CMJ, na.rm = TRUE),
@@ -135,7 +132,6 @@ AmateurUnique <- ddply(Amateurs, .(id, Position), summarize,
                        avg_X40m = mean(X40m, na.rm = TRUE),
                        avg_Max.Speed = mean(Max.Speed, na.rm = TRUE),
                        avg_ASR = mean(ASR, na.rm = TRUE),
-                       avg_Squat.Jump = mean(Squat.Jump, na.rm = TRUE),
                        avg_Broad.Jump = mean(Broad.Jump, na.rm = TRUE),
                        avg_CMJ = mean(CMJ, na.rm = TRUE)
                        )
@@ -151,7 +147,6 @@ AmateurUniqueNoPos <- ddply(Amateurs, .(id), summarize,
                             avg_X40m = mean(X40m, na.rm = TRUE),
                             avg_Max.Speed = mean(Max.Speed, na.rm = TRUE),
                             avg_ASR = mean(ASR, na.rm = TRUE),
-                            avg_Squat.Jump = mean(Squat.Jump, na.rm = TRUE),
                             avg_Broad.Jump = mean(Broad.Jump, na.rm = TRUE),
                             avg_CMJ = mean(CMJ, na.rm = TRUE)
                             ) 
@@ -168,7 +163,6 @@ AmateurBestPerformance <- ddply(Amateurs, .(id, Position), summarize,
                                 X40m = min(c(X40m, 100), na.rm = TRUE),
                                 Max.Speed = max(c(Max.Speed, 0), na.rm = TRUE),
                                 ASR = max(c(ASR, 0), na.rm = TRUE),
-                                Squat.Jump = max(c(Squat.Jump, 0), na.rm = TRUE),
                                 Broad.Jump = max(c(Broad.Jump, 0), na.rm = TRUE),
                                 Max_CMJ = max(c(CMJ, 0), na.rm = TRUE),
                                 Min_CMJ = min(c(CMJ, 100), na.rm = TRUE) 
@@ -183,6 +177,8 @@ head(AmateurBestPerformance)
 # Compare and score each player against the WNT metrics for each test
 # For now use a 0-6 scale: 0 = below min, 1 = between min and first quartile, ..., 4 = between third quartile and max, 5 = beyond max
 # Scale is reversed for events that desire low test scores (timed events) so that an overall high score indicates excellent testing
+# Another study by Dardouri et al. (2014) investigated the use of ASR as a predictor of repeated sprint performance. Their findings indicated that higher ASR values were highly correlated with both improved total time and peak time in repeated sprint ability (Dardouri et al. 2014).
+  # Means ASR should be bigger for better athletes/sprinters
 comparison <- function(playerRow){
   if(playerRow$Position[1] == "CF"){
     pos <- "FWD"
@@ -218,7 +214,7 @@ comparison <- function(playerRow){
   }
   
   # Non-timed events
-  untimed <- playerRow %>% select(avg_Mass, avg_Height, avg_Max.Speed, avg_Squat.Jump, avg_Broad.Jump)
+  untimed <- playerRow %>% select(avg_Mass, avg_Height, avg_Max.Speed, avg_Broad.Jump, avg_CMJ, avg_ASR)
   for(j in names(untimed)){
     
     if(!is.na(playerRow[, i])){
@@ -278,7 +274,120 @@ chart.Correlation(corVars, histogram =TRUE, pch = 19)
 
 
 ############ IMPUTATION #############
+############################################### CHECKING WITH ARTIFICIAL NA VALUES #########################################################
+# Check usefulness of imputation with the complete data and random removals
 library(mice)
+library(abind)
+goodDataAmateur <- Amateurs[Amateurs$UsableData >= 9, ]
+modified <- goodDataAmateur
+
+# Test with 20 random NA values per column, randomly done over the set
+for(i in 1:8){
+  samp <- sample(1:dim(goodDataAmateur)[1], 20)
+  modified[samp, i + 9] <- NA
+}
+summary(modified) # Each entry now has 20 missing values
+
+# Do the imputation with mice
+toImpAmateur <- modified[, 10:17]
+miceImpAmateur <- mice(toImpAmateur)
+test1 <- complete(miceImpAmateur, action = 1)
+test2 <- complete(miceImpAmateur, action = 2)
+test3 <- complete(miceImpAmateur, action = 3)
+test4 <- complete(miceImpAmateur, action = 4)
+test5 <- complete(miceImpAmateur, action = 5)
+
+amateurImputed <- data.frame()
+
+for(i in 1:dim(test1)[1]){
+  for(j in 1:dim(test1)[2]){
+    amateurImputed[i,j] <- mean(test1[i, j],
+                                test2[i, j],
+                                test3[i, j],
+                                test4[i, j],
+                                test5[i, j])
+  }
+}
+names(amateurImputed) <- names(toImpAmateur)
+amateurImputed$id <- toImpAmateur$id
+amateurImputed
+
+
+
+tempCheck <- amateurImputed - goodDataAmateur[, 10:17]
+
+#for(i in 1:8){
+#  imputedHolder <- tempCheck[, i]
+#  imputed <- imputedHolder[imputedHolder != 0] %>% quantile( na.rm = TRUE)
+#  print(summary(imputed))
+#}
+
+# Biggest mistakes for each variable
+  # x30.15: -2.5 seconds
+  # x10m: -0.07 (or 0.06)
+  # x30m: -0.05
+  # x40m: -0.11
+  # Max.Speed: -0.8, 0.6
+  # ASR: -0.4, 1.97
+  # Broad.Jump: -47, 20
+  # CMJ: -8.7, 10.3
+# Ranges (25-75)  and %off the median value
+  # x30.15: 0.5, 0.5, 2.6%, 2.6%  
+  # x10m: -0.04, .0275, 2.1%, 1.4%
+  # x30m: -.025, .02, 0.5%, 0.5%
+  # x40m: -.02, 0.01, 0.3%, 0.15%
+  # Max.Speed: -.2, .325, 0.7%, 1%
+  # ASR: -.19, .285, 2%, 3%
+  # Broad.Jump: -16, 2, 7.8%, 1%
+  # CMJ: -4.625, 2.8, 15.4%, 9.3%
+# Summary: With relatively complete data, imputation looks reasonable for all but the CMJ imputation
+
+
+# MICE looks to be underestimating on imputation for most variables
+sum(tempCheck, na.rm = TRUE)
+summary(tempCheck)
+
+# Testing with Knn imputation
+library(VIM)
+fullSet <- modified
+knnTest <- kNN(as.tibble(scale(fullSet[, 10:17])), k = 5)
+knnTest
+scales <- attr(knnTest$X30.15, "scaled:scale")
+centers <-attr(knnTest$X30.15, "scaled:center")
+# Backtransform the scale after imputation
+newData <- (knnTest[, 1]*scales[[1]] + centers[[1]]) %>% as.data.frame()
+for(i in 2:8){
+  print(i)
+  newData <- cbind(newData, knnTest[, i]*scales[[i]] + centers[[i]])
+}
+
+names(newData) <- names(fullSet[, 10:17])
+# Compare imputed with the full data set
+check <- newData - goodDataAmateur[, 10:17]
+summary(check[check$CMJ != 0,])
+
+# Biggest mistakes for each variable
+  # x30.15: -2, 2            Worse
+  # x10m: -0.11, 0.08        Worse
+  # x30m: -0.18, 0.12        Worse
+  # x40m: -0.37              Worse
+  # Max.Speed: -1.4, 1.9     Worse
+  # ASR: -1.43, 2.36         Worse
+  # Broad.Jump: -21, 14      Better
+  # CMJ: -7.6, 5.1           Better
+# Ranges (25-75)  and whether the results are better or worse than MICE
+  # x30.15: -1.5, 1          Worse
+  # x10m: -0.11, .03         Worse
+  # x30m: -.055, .045        Worse
+  # x40m: -.09, 0.04         Worse
+  # Max.Speed: 0, .825       Worse
+  # ASR: -.795, .635         Worse
+  # Broad.Jump: -14, 6.25    Better
+  # CMJ: -3.275, 0.475       Better
+
+########################################################################### END CHECK ##################################################################
+
+# Actual imputation
 corVarsMICE <- mice(corVars)
 tempSet1 <- complete(corVarsMICE, action = 1)
 tempSet2 <- complete(corVarsMICE, action = 2)
