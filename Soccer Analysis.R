@@ -266,7 +266,7 @@ arbitraryX40M <- ggplot(data = Amateurs[Amateurs$UsableData>=10, ], aes(x = Age,
   geom_point()+
   geom_line()
 
-dim(Amateurs[Amateurs$UsableData >= 11, ])
+dim(Amateurs[Amateurs$UsableData >= 9, ])
 
 library("PerformanceAnalytics")
 corVars <- Amateurs[, c(8:17)]
@@ -363,7 +363,7 @@ for(i in 2:8){
 
 names(newData) <- names(fullSet[, 10:17])
 # Compare imputed with the full data set
-check <- newData - goodDataAmateur[, 10:17]
+check <- newData - goodDataAmateur[, 10:17] # NA's exist because of existance in goodDataAmateur
 summary(check[check$CMJ != 0,])
 
 # Biggest mistakes for each variable
@@ -387,7 +387,7 @@ summary(check[check$CMJ != 0,])
 
 ########################################################################### END CHECK ##################################################################
 
-# Actual imputation
+# Actual imputation for amateurs
 corVarsMICE <- mice(corVars)
 tempSet1 <- complete(corVarsMICE, action = 1)
 tempSet2 <- complete(corVarsMICE, action = 2)
@@ -428,7 +428,89 @@ library(VIM)
 fullSet <- Amateurs[, c(8:17)]
 timedAmateur <- Amateurs[, 10:13]
 untimedAmateur <- Amateurs[, c(8, 9, 14:17)]
-knnTest <- kNN(as.tibble(scale(fullSet)), k = 5)
-knnTest
+knnAct <- kNN(as.tibble(scale(fullSet)), k = 5)
+knnAct
 
-mean(c(-scale(fullSet$Mass), -knnTest$Mass), na.rm = TRUE)
+
+scalesAct <- attr(knnAct$X30.15, "scaled:scale")
+centersAct <-attr(knnAct$X30.15, "scaled:center")
+
+actualKNNResults <- (knnAct[, 1]*scalesAct[[1]] + centersAct[[1]]) %>% as.data.frame()
+for(i in 2:10){
+  print(i)
+  actualKNNResults <- cbind(actualKNNResults, knnAct[, i]*scalesAct[[i]] + centersAct[[i]])
+}
+names(actualKNNResults) <- names(fullSet)
+
+finalImputedSet <- imputedSet
+finalImputedSet$Broad.Jump <- actualKNNResults$Broad.Jump # Knn worked better for jumping variables
+finalImputedSet$CMJ <- actualKNNResults$CMJ # Thus we change cmj and broadjump
+
+
+
+######################################################################################
+
+# Imputation for the WNT
+corVarsWNT <- WNT[, c(8:17)]
+chart.Correlation(corVarsWNT, histogram =TRUE, pch = 19)
+
+corVarsMICE <- mice(corVarsWNT)
+tempSet1 <- complete(corVarsMICE, action = 1)
+tempSet2 <- complete(corVarsMICE, action = 2)
+tempSet3 <- complete(corVarsMICE, action = 3)
+tempSet4 <- complete(corVarsMICE, action = 4)
+tempSet5 <- complete(corVarsMICE, action = 5)
+
+# Bind the matrices to prove correlation is retained
+library(abind)
+cor_array <- abind(cor(tempSet1),
+                   cor(tempSet2),
+                   cor(tempSet3),
+                   cor(tempSet4),
+                   cor(tempSet5),
+                   along = 3)
+
+cor_array_mean <- apply(cor_array, c(1,2), mean)
+cor_array_var  <- apply(cor_array, c(1,2), var)
+
+cor_array_mean
+
+imputedSetWNT <- data.frame()
+
+for(i in 1:dim(tempSet1)[1]){
+  for(j in 1:dim(tempSet1)[2]){
+    imputedSetWNT[i,j] <- mean(tempSet1[i, j],
+                            tempSet2[i, j],
+                            tempSet3[i, j],
+                            tempSet4[i, j],
+                            tempSet5[i, j])
+  }
+}
+names(imputedSetWNT) <- names(WNT)[8:17]
+imputedSetWNT$id <- WNT$id
+
+# KNN imputation, clean this up for the scaling to get back normal values 
+library(VIM)
+fullSetWNT <- WNT[, c(8:17)]
+knnActWNT <- kNN(as.tibble(scale(fullSetWNT)), k = 5)
+knnActWNT
+
+
+scalesActWNT <- attr(knnActWNT$X30.15, "scaled:scale")
+centersActWNT <-attr(knnActWNT$X30.15, "scaled:center")
+
+actualKNNResultsWNT <- (knnActWNT[, 1]*scalesActWNT[[1]] + centersActWNT[[1]]) %>% as.data.frame()
+for(i in 2:10){
+  print(i)
+  actualKNNResultsWNT <- cbind(actualKNNResultsWNT, knnActWNT[, i]*scalesActWNT[[i]] + centersActWNT[[i]])
+}
+names(actualKNNResultsWNT) <- names(fullSetWNT)
+
+finalImputedSetWNT <- imputedSetWNT
+finalImputedSetWNT$Broad.Jump <- actualKNNResultsWNT$Broad.Jump # Knn worked better for jumping variables
+finalImputedSetWNT$CMJ <- actualKNNResultsWNT$CMJ # Thus we change cmj and broadjump
+##############################################
+
+# Write the imputations to csv's
+write.csv(finalImputedSet, "AmateurImputed.csv")
+write.csv(finalImputedSetWNT, "WNTImputed.csv")
