@@ -54,33 +54,33 @@ WNTPlayers <- ddply(WNT, .(id, Team, Position), summarize,
                     avg_ASR = mean(ASR, na.rm = TRUE),
                     avg_Broad.Jump = mean(Broad.Jump, na.rm = TRUE),
                     avg_CMJ = mean(CMJ, na.rm = TRUE))
-head(WNTPlayers)
+
 dim(WNTPlayers) # Verify the discrepancies between the number of rows and the number of unique id's
 length(unique(WNTPlayers$id)) # Might be a player that switched positions in testing
 
-MeanAndDevWNT <- ddply(WNTPlayers, .(Position), summarize,
-                         std_Mass = sd(avg_Mass, na.rm = TRUE),
-                         avg_Mass = mean(avg_Mass, na.rm = TRUE),
-                         std_Height = sd(avg_Height, na.rm = TRUE),
-                         avg_Height = mean(avg_Height, na.rm = TRUE),
-                         std_X30.15 = sd(avg_X30.15, na.rm = TRUE),
-                         avg_X30.15 = mean(avg_X30.15, na.rm = TRUE),
-                         std_X10m = sd(avg_X10m, na.rm = TRUE),
-                         avg_X10m = mean(avg_X10m, na.rm = TRUE),
-                         std_X30m = sd(avg_X30m, na.rm = TRUE),
-                         avg_X30m = mean(avg_X30m, na.rm = TRUE),
-                         std_X40m = sd(avg_X40m, na.rm = TRUE),
-                         avg_X40m = mean(avg_X40m, na.rm = TRUE),
-                         std_Max.Speed = sd(avg_Max.Speed, na.rm = TRUE),
-                         avg_Max.Speed = mean(avg_Max.Speed, na.rm = TRUE),
-                         std_ASR = sd(avg_ASR, na.rm = TRUE),
-                         avg_ASR = mean(avg_ASR, na.rm = TRUE),
-                         std_Broad.Jump = sd(avg_Broad.Jump, na.rm = TRUE),
-                         avg_Broad.Jump = mean(avg_Broad.Jump, na.rm = TRUE),
-                         std_CMJ = sd(avg_CMJ, na.rm = TRUE),
-                         avg_CMJ = mean(avg_CMJ, na.rm = TRUE)
-                         )
-MeanAndDevWNT # For some reason sd() only calculated non-NA values if done prior to the mean calculation
+# MeanAndDevWNT <- ddply(WNTPlayers, .(Position), summarize,
+#                          std_Mass = sd(avg_Mass, na.rm = TRUE),
+#                          avg_Mass = mean(avg_Mass, na.rm = TRUE),
+#                          std_Height = sd(avg_Height, na.rm = TRUE),
+#                          avg_Height = mean(avg_Height, na.rm = TRUE),
+#                          std_X30.15 = sd(avg_X30.15, na.rm = TRUE),
+#                          avg_X30.15 = mean(avg_X30.15, na.rm = TRUE),
+#                          std_X10m = sd(avg_X10m, na.rm = TRUE),
+#                          avg_X10m = mean(avg_X10m, na.rm = TRUE),
+#                          std_X30m = sd(avg_X30m, na.rm = TRUE),
+#                          avg_X30m = mean(avg_X30m, na.rm = TRUE),
+#                          std_X40m = sd(avg_X40m, na.rm = TRUE),
+#                          avg_X40m = mean(avg_X40m, na.rm = TRUE),
+#                          std_Max.Speed = sd(avg_Max.Speed, na.rm = TRUE),
+#                          avg_Max.Speed = mean(avg_Max.Speed, na.rm = TRUE),
+#                          std_ASR = sd(avg_ASR, na.rm = TRUE),
+#                          avg_ASR = mean(avg_ASR, na.rm = TRUE),
+#                          std_Broad.Jump = sd(avg_Broad.Jump, na.rm = TRUE),
+#                          avg_Broad.Jump = mean(avg_Broad.Jump, na.rm = TRUE),
+#                          std_CMJ = sd(avg_CMJ, na.rm = TRUE),
+#                          avg_CMJ = mean(avg_CMJ, na.rm = TRUE)
+#                          )
+# MeanAndDevWNT # For some reason sd() only calculated non-NA values if done prior to the mean calculation
 
 # Create plot to show mean and a basic interval to hit by position
   # Note that some skills are preferred to be out of the interval
